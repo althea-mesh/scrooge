@@ -6,8 +6,6 @@ import (
 	"log"
 	"net"
 
-	"fmt"
-
 	"github.com/agl/ed25519"
 	"github.com/incentivized-mesh-infrastructure/scrooge/neighborAPI"
 	"github.com/incentivized-mesh-infrastructure/scrooge/network"
@@ -70,22 +68,20 @@ func main() {
 				log.Fatalln(err)
 			}
 		}
-		err := network.McastListen(
-			8481,
+		err := network.ListenEthernet(
 			iface,
 			neighborAPI.Handlers,
 			callback,
 		)
-		fmt.Println("derp")
+
 		if err != nil {
-			fmt.Println("ooops")
 			log.Fatalln(err)
 		}
 	} else {
 		log.Println("SendMcastHello")
-		err := neighborAPI.SendMcastHello(
+		err := neighborAPI.SendHello(
 			iface,
-			8481,
+			false,
 		)
 		if err != nil {
 			log.Fatalln(err)
