@@ -1,8 +1,7 @@
 #!bash
 
-./scrooge -l \
+./scrooge \
 -interface eth0 \
--controlAddress 10.0.0.2:8000 \
 -publicKey LLBQ9vdHBeVsb55NEnRiHFQ71122IvAFk+XT/Szd7VU= \
 -privateKey cEWVkEjpGbx810PI1e2Ff9f95oYayhnWJBPpV9Spd+IssFD290cF5Wxvnk0SdGIcVDvXXbYi8AWT5dP9LN3tVQ== \
 -tunnelPublicKey cRwjM2IXh/NM1Ebjg2lCr4pjTYeI83MI0WBl7zLH3Uk= \

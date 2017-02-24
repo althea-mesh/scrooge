@@ -1,28 +1,4 @@
-```go
-type Account struct {
-	PublicKey         [ed25519.PublicKeySize]byte
-	PrivateKey        [ed25519.PrivateKeySize]byte
-	Seqnum         int
-	ControlAddress string
-	TunnelPublicKey   string
-	TunnelPrivateKey  string
-}
-
-type Neighbor struct {
-	PublicKey         [ed25519.PublicKeySize]byte
-	Seqnum         int
-	ControlAddress string
-	BillingDetails struct {
-		PaymentAddress string
-	}
-	Tunnel struct {
-		PublicKey           string
-		ListenPort       int            // Every tunnel needs to listen on a different port
-		Endpoint         string         // This is the tunnel endpoint on the Neighbor
-		VirtualInterface *net.Interface // virtual interface created by the tunnel
-	}
-}
-```
+Scrooge is intended to allow nodes to create tunnels with neighbors on their network, then throttle those tunnels based on the receipt of cryptocurrency payments.
 
 Neighbor discovery:
 
@@ -30,26 +6,23 @@ Scrooge can be run on one or more network interfaces. It intermittently broadcas
 
 ### Scrooge hello message
 
-`scrooge_hello <publicKey> <control address> <seq num> <signature>`
+`scrooge_hello <publicKey> <seq num> <signature>`
 
 - PublicKey: base64 encoded ed25519 public key. This is used by neighbors to identify each other and sign messages, including the `scrooge_hello` message.
-- Control address: The IP address and port where one can send out of band control information.
 - Sequence number: Incremented with each hello to prevent playback attacks
 - Signature: The signature of the publicKey over the fields of this message, concatenated as byte strings with no spaces (we may want to tweak this?)
 
 When a node receives one of these messages: 
 - It first checks the signature, and adds a record of this Neighbor if it does not already exist (neighbors are identified by public key). 
 - It checks the SeqNum to prevent replay attack.
-- It updates the ControlAddress of the neighbor with the given PublicKey.
-- It sends a `scrooge_hello_confirm` message to the neighbor’s control address
+- It sends a `scrooge_hello_confirm` message.
 
 ### Scrooge hello confirm message
-`scrooge_hello_confirm <publicKey> <control address> <seq num> <signature>`
+`scrooge_hello_confirm <publicKey> <seq num> <signature>`
 
 When a node receives one of these messages: 
 - It first checks the signature, and adds a record of this Neighbor if it does not already exist (neighbors are identified by public key). 
 - It checks the SeqNum to prevent replay attack.
-- It updates the ControlAddress of the neighbor with the given PublicKey.
 - It may start a tunnel and send a scrooge tunnel message as described below.
 
 ### Scrooge tunnel message

@@ -17,7 +17,7 @@ type NeighborAPI struct {
 	Account   *types.Account
 	Network   interface {
 		SendUDP(*net.UDPAddr, string) error
-		SendMulticastUDP(*net.Interface, int, string) error
+		SendMulticastUDP(*net.Interface, string) error
 	}
 }
 
@@ -29,28 +29,40 @@ func (self *NeighborAPI) Handlers(
 
 	log.Println("received: " + string(b))
 
-	if msg[0] == "scrooge_hello" || msg[0] == "scrooge_hello_confirm" {
-		return self.helloHandler(msg, iface)
+	switch msg[0] {
+	case "scrooge_hello":
+		return self.helloMsgHandler(msg, iface, false)
+	case "scrooge_hello_confirm":
+		return self.helloMsgHandler(msg, iface, true)
+	case "scrooge_tunnel":
+		return self.tunnelMsgHandler(msg, iface, false)
+	case "scrooge_tunnel_confirm":
+		return self.tunnelMsgHandler(msg, iface, true)
 	}
 
 	return errors.New("unrecognized message type")
 }
 
-func (self *NeighborAPI) helloHandler(
+func (self *NeighborAPI) helloMsgHandler(
 	msg []string,
 	iface *net.Interface,
+	confirm bool,
 ) error {
-	helloMessage, err := serialization.ParseHello(msg)
+	helloMessage, err := serialization.ParseHelloMsg(msg, confirm)
 	if err != nil {
 		return err
 	}
 
-	neighbor := self.Neighbors[helloMessage.PublicKey]
+	if helloMessage.SourcePublicKey == self.Account.PublicKey {
+		return nil
+	}
+
+	neighbor := self.Neighbors[helloMessage.SourcePublicKey]
 	if neighbor == nil {
 		neighbor = &types.Neighbor{
-			PublicKey: helloMessage.PublicKey,
+			PublicKey: helloMessage.SourcePublicKey,
 		}
-		self.Neighbors[helloMessage.PublicKey] = neighbor
+		self.Neighbors[helloMessage.SourcePublicKey] = neighbor
 	}
 
 	if neighbor.Seqnum >= helloMessage.Seqnum {
@@ -58,10 +70,9 @@ func (self *NeighborAPI) helloHandler(
 	}
 
 	neighbor.Seqnum = helloMessage.Seqnum
-	neighbor.ControlAddress = helloMessage.ControlAddress
 
 	if !helloMessage.Confirm {
-		err = self.SendHello(&neighbor.ControlAddress, iface, true)
+		err = self.SendHelloMsg(iface, true)
 		if err != nil {
 			return err
 		}
@@ -69,29 +80,64 @@ func (self *NeighborAPI) helloHandler(
 	return nil
 }
 
-func (self *NeighborAPI) SendHello(
-	neighAddr *net.UDPAddr,
+func (self *NeighborAPI) tunnelMsgHandler(
+	msg []string,
 	iface *net.Interface,
 	confirm bool,
 ) error {
-	self.Account.Seqnum = self.Account.Seqnum + 1
-	controlAddress := self.Account.ControlAddresses[iface.Name]
-
-	msg := types.HelloMessage{
-		MessageMetadata: types.MessageMetadata{
-			Seqnum:    self.Account.Seqnum,
-			PublicKey: self.Account.PublicKey,
-		},
-		ControlAddress: controlAddress,
-		Confirm:        confirm,
-	}
-
-	s, err := serialization.FmtHello(msg, self.Account.PrivateKey)
+	tunnelMessage, err := serialization.ParseTunnelMsg(msg, confirm)
 	if err != nil {
 		return err
 	}
 
-	err = self.Network.SendUDP(neighAddr, s)
+	if tunnelMessage.SourcePublicKey == self.Account.PublicKey ||
+		tunnelMessage.DestinationPublicKey != self.Account.PublicKey {
+		return nil
+	}
+
+	neighbor := self.Neighbors[tunnelMessage.SourcePublicKey]
+	if neighbor == nil {
+		neighbor = &types.Neighbor{
+			PublicKey: tunnelMessage.SourcePublicKey,
+		}
+		self.Neighbors[tunnelMessage.SourcePublicKey] = neighbor
+	}
+
+	if neighbor.Seqnum >= tunnelMessage.Seqnum {
+		return errors.New(fmt.Sprint("sequence number too low"))
+	}
+
+	neighbor.Seqnum = tunnelMessage.Seqnum
+
+	if !tunnelMessage.Confirm {
+		err = self.SendHelloMsg(iface, true)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (self *NeighborAPI) SendHelloMsg(
+	iface *net.Interface,
+	confirm bool,
+) error {
+	self.Account.Seqnum = self.Account.Seqnum + 1
+
+	msg := types.HelloMessage{
+		MessageMetadata: types.MessageMetadata{
+			Seqnum:          self.Account.Seqnum,
+			SourcePublicKey: self.Account.PublicKey,
+		},
+		Confirm: confirm,
+	}
+
+	s, err := serialization.FmtHelloMsg(msg, self.Account.PrivateKey)
+	if err != nil {
+		return err
+	}
+
+	err = self.Network.SendMulticastUDP(iface, s)
 	if err != nil {
 		return err
 	}
@@ -101,43 +147,7 @@ func (self *NeighborAPI) SendHello(
 	return nil
 }
 
-func (self *NeighborAPI) SendMcastHello(
-	iface *net.Interface,
-	port int,
-) error {
-	self.Account.Seqnum = self.Account.Seqnum + 1
-	controlAddress := self.Account.ControlAddresses[iface.Name]
-
-	msg := types.HelloMessage{
-		MessageMetadata: types.MessageMetadata{
-			Seqnum:    self.Account.Seqnum,
-			PublicKey: self.Account.PublicKey,
-		},
-		ControlAddress: controlAddress,
-		Confirm:        false,
-	}
-
-	fmt.Println("MESSAGE: ", msg)
-	fmt.Println("CONTROLADDRESS: ", msg.ControlAddress)
-
-	s, err := serialization.FmtHello(msg, self.Account.PrivateKey)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("STRING: ", s)
-
-	err = self.Network.SendMulticastUDP(iface, port, s)
-	if err != nil {
-		return err
-	}
-
-	self.Account.Seqnum = self.Account.Seqnum + 1
-
-	return nil
-}
-
-func (self *NeighborAPI) SendTunnel(
+func (self *NeighborAPI) SendTunnelMsg(
 	neighborPublicKey [ed25519.PublicKeySize]byte,
 	iface *net.Interface,
 	confirm bool,
@@ -147,15 +157,16 @@ func (self *NeighborAPI) SendTunnel(
 
 	msg := types.TunnelMessage{
 		MessageMetadata: types.MessageMetadata{
-			PublicKey: self.Account.PublicKey,
-			Seqnum:    self.Account.Seqnum,
+			SourcePublicKey:      self.Account.PublicKey,
+			DestinationPublicKey: neighborPublicKey,
+			Seqnum:               self.Account.Seqnum,
 		},
 		TunnelEndpoint:  neighbor.Tunnel.Endpoint,
 		TunnelPublicKey: neighbor.Tunnel.PublicKey,
 		Confirm:         confirm,
 	}
 
-	s, err := serialization.FmtTunnel(
+	s, err := serialization.FmtTunnelMsg(
 		msg,
 		self.Account.PrivateKey,
 	)
@@ -163,7 +174,7 @@ func (self *NeighborAPI) SendTunnel(
 		return err
 	}
 
-	err = self.Network.SendUDP(&neighbor.ControlAddress, s)
+	err = self.Network.SendMulticastUDP(iface, s)
 	if err != nil {
 		return err
 	}

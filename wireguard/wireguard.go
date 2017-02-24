@@ -7,11 +7,28 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"errors"
 
 	"github.com/incentivized-mesh-infrastructure/scrooge/types"
 )
+
+func Genkeys() (string, string, error) {
+	privkey, err := exec.Command("wg", "genkey").Output()
+	if err != nil {
+		return "", "", err
+	}
+
+	cmd := exec.Command("wg", "pubkey")
+	cmd.Stdin = strings.NewReader(string(privkey))
+	pubkey, err := cmd.Output()
+	if err != nil {
+		return "", "", err
+	}
+
+	return string(pubkey), string(privkey), nil
+}
 
 func CreateTunnel(
 	tunnel *types.Tunnel,

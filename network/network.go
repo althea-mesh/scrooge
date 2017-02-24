@@ -5,11 +5,12 @@ import (
 	"net"
 )
 
-type Network struct{}
+type Network struct {
+	MulticastPort int
+}
 
 // McastListen listens on the multicast UDP address on a given interface.
 func (self *Network) McastListen(
-	port int,
 	iface *net.Interface,
 	handlers func([]byte, *net.Interface) error,
 	cb func(error),
@@ -19,7 +20,7 @@ func (self *Network) McastListen(
 		iface,
 		&net.UDPAddr{
 			IP:   net.ParseIP("ff02::1"),
-			Port: port,
+			Port: self.MulticastPort,
 			Zone: iface.Name,
 		},
 	)
@@ -36,32 +37,6 @@ func (self *Network) McastListen(
 			continue
 		}
 		cb(handlers(b[:offset], iface))
-	}
-
-	return nil
-}
-
-func (self *Network) UnicastListen(
-	addr *net.UDPAddr,
-	iface *net.Interface,
-	handlers func([]byte, *net.Interface) error,
-	cb func(error),
-) error {
-	conn, err := net.ListenUDP("udp6", addr)
-	if err != nil {
-		return err
-	}
-
-	defer conn.Close()
-
-	for {
-		var b []byte
-		_, _, err := conn.ReadFromUDP(b)
-		if err != nil {
-			cb(err)
-			continue
-		}
-		cb(handlers(b, iface))
 	}
 
 	return nil
@@ -93,12 +68,11 @@ func (self *Network) SendUDP(
 
 func (self *Network) SendMulticastUDP(
 	iface *net.Interface,
-	port int,
 	s string,
 ) error {
 	err := self.SendUDP(&net.UDPAddr{
 		IP:   net.ParseIP("ff02::1"),
-		Port: port,
+		Port: self.MulticastPort,
 		Zone: iface.Name,
 	}, s)
 	if err != nil {
