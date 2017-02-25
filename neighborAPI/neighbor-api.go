@@ -57,6 +57,11 @@ func (self *NeighborAPI) helloMsgHandler(
 		return nil
 	}
 
+	if helloMessage.DestinationPublicKey != self.Account.PublicKey &&
+		helloMessage.DestinationPublicKey != [ed25519.PublicKeySize]byte{} {
+		return nil
+	}
+
 	neighbor := self.Neighbors[helloMessage.SourcePublicKey]
 	if neighbor == nil {
 		neighbor = &types.Neighbor{
@@ -66,7 +71,7 @@ func (self *NeighborAPI) helloMsgHandler(
 	}
 
 	if neighbor.Seqnum >= helloMessage.Seqnum {
-		return errors.New(fmt.Sprint("sequence number too low"))
+		return errors.New("sequence number too low")
 	}
 
 	neighbor.Seqnum = helloMessage.Seqnum

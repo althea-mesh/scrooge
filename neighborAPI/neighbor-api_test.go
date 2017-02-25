@@ -98,14 +98,13 @@ func TestHelloMsg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// buf := new(bytes.Buffer)
+	if node1.Neighbors[node2.Account.PublicKey] == nil {
+		t.Fatal("node1.Neighbors[node2.Account.PublicKey] == nil")
+	}
 
-	// spew.Dump(node1.Neighbors)
-
-	// spew.Fprintf(buf, "%#v", node1)
-	// fmt.Println(buf.String())
-	// spew.Fprintf("%#v", node2)
-
+	if node2.Neighbors[node1.Account.PublicKey] == nil {
+		t.Fatal("node2.Neighbors[node1.Account.PublicKey] == nil")
+	}
 }
 
 func TestBadSeqnum(t *testing.T) {
@@ -136,5 +135,27 @@ func TestBadSeqnum(t *testing.T) {
 	err = node2.Handlers([]byte(helloMessage), iface)
 	if err == nil {
 		t.Fatal("no sequence number error returned")
+	}
+}
+
+func TestBadSignature(t *testing.T) {
+	node1, fakeNet1, node2, _ := createNodes()
+
+	err := node1.SendHelloMsg(iface, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := fakeNet1.SendMcastUDPArgs.string
+
+	// Mess with the signature
+	msg = msg[:len(msg)-4] + "2" + msg[len(msg)-3:]
+
+	err = node2.Handlers([]byte(msg), iface)
+	if err == nil {
+		t.Fatal("no signature error")
+	}
+	if err.Error() != "signature not valid" {
+		t.Fatal("wrong error: ", err.Error())
 	}
 }

@@ -121,7 +121,7 @@ func verifyMessage(msg []string) (*types.MessageMetadata, error) {
 	destinationPublicKey := types.BytesToPublicKey(dpk)
 
 	msgWithOutSig := strings.Join(msg[:len(msg)-1], " ")
-	fmt.Println(msgWithOutSig)
+
 	if !ed25519.Verify(&sourcePublicKey, []byte(msgWithOutSig), &signature) {
 		return nil, errors.New("signature not valid")
 	}
