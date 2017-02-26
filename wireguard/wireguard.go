@@ -24,7 +24,7 @@ func Genkeys() (string, string, error) {
 	}
 
 	cmd := exec.Command("wg", "pubkey")
-	cmd.Stdin = strings.NewReader(string(privkey))
+	cmd.Stdin = bytes.NewReader(privkey)
 	pubkey, err := cmd.Output()
 	if err != nil {
 		return "", "", err

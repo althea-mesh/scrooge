@@ -12,6 +12,7 @@ import (
 	"github.com/incentivized-mesh-infrastructure/scrooge/neighborAPI"
 	"github.com/incentivized-mesh-infrastructure/scrooge/network"
 	"github.com/incentivized-mesh-infrastructure/scrooge/types"
+	"github.com/incentivized-mesh-infrastructure/scrooge/wireguard"
 )
 
 func main() {
@@ -35,21 +36,23 @@ func main() {
 
 		// fmt.Printf("%#v %#v", scroogePubkey, scroogePrivkey)
 
-		wireguardPubkey, wireguardPrivkey, err := ed25519.GenerateKey(rand.Reader)
+		wireguardPubkey, wireguardPrivkey, err := wireguard.Genkeys()
 		if err != nil {
 			log.Fatalln(err)
 		}
 
 		fmt.Printf(
 			`scrooge pubkey: %v
+
 scrooge privkey: %v
+
 wireguard pubkey: %v
 wireguard privkey: %v
 `,
 			base64.StdEncoding.EncodeToString(scroogePubkey[:]),
 			base64.StdEncoding.EncodeToString(scroogePrivkey[:]),
-			base64.StdEncoding.EncodeToString(wireguardPubkey[:]),
-			base64.StdEncoding.EncodeToString(wireguardPrivkey[:]),
+			wireguardPubkey,
+			wireguardPrivkey,
 		)
 
 	} else {
