@@ -14,7 +14,7 @@
             "args": [
                 "-test.v",
                 "-test.run",
-                "BadSignature"
+                ""
             ],
             "showLog": true
         }

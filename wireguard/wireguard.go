@@ -2,7 +2,6 @@ package wireguard
 
 import (
 	"io/ioutil"
-	"net"
 	"os"
 	"os/exec"
 	"regexp"
@@ -10,6 +9,10 @@ import (
 	"strings"
 
 	"errors"
+
+	"bytes"
+
+	"fmt"
 
 	"github.com/incentivized-mesh-infrastructure/scrooge/types"
 )
@@ -30,13 +33,43 @@ func Genkeys() (string, string, error) {
 	return string(pubkey), string(privkey), nil
 }
 
+func execCommand(command string, args ...string) ([]byte, error) {
+	stdout, stderr := bytes.Buffer{}, bytes.Buffer{}
+	cmd := exec.Command(command, args...)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		fmt.Println("REAL ERR", err)
+		var message string
+		if stderr.Len() == 0 {
+			message = stdout.String()
+		} else {
+			message = stderr.String()
+		}
+		return nil, errors.New(
+			"command `" + command + " " +
+				strings.Join(args, " ") + "` failed. " + message)
+	}
+
+	return stdout.Bytes(), nil
+}
+
 func CreateTunnel(
 	tunnel *types.Tunnel,
-	tunnelAddress net.UDPAddr,
 	tunnelPrivateKey string,
 ) error {
-	exec.Command("ip", "link", "add", "dev", tunnel.VirtualInterface.Name, "type", "wireguard").Run()
-	exec.Command("ip", "address", "add", "dev", tunnel.VirtualInterface.Name, tunnelAddress.IP.String()).Run()
+	_, err := execCommand("ip", "link", "add", "dev", tunnel.VirtualInterface.Name, "type", "wireguard")
+	if err != nil {
+		if regexp.MustCompile(`File exists`).MatchString(err.Error()) {
+			_, err := execCommand("ip", "link", "del", tunnel.VirtualInterface.Name)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
 
 	privateKeyFile, err := ioutil.TempFile("", "example")
 	if err != nil {
@@ -58,16 +91,20 @@ func CreateTunnel(
 		return err
 	}
 
-	exec.Command(
-		"wg", "set", tunnel.VirtualInterface.Name,
-		"listen-port", string(tunnelAddress.Port),
+	_, err = execCommand("wg", "set", tunnel.VirtualInterface.Name,
+		"listen-port", strconv.FormatUint(uint64(tunnel.ListenPort), 10),
 		"private-key", privateKeyFile.Name(),
 		"peer", tunnel.PublicKey,
 		"allowed-ips", "0.0.0.0",
-		"endpoint", tunnel.Endpoint,
-	).Run()
+		"endpoint", tunnel.Endpoint)
+	if err != nil {
+		return err
+	}
 
-	exec.Command("ip", "link", "set", "up", tunnel.VirtualInterface.Name).Run()
+	_, err = execCommand("ip", "link", "set", "up", tunnel.VirtualInterface.Name)
+	if err != nil {
+		return err
+	}
 
 	out, err := exec.Command("wg", "showconf", tunnel.VirtualInterface.Name).Output()
 	if err != nil {
@@ -80,8 +117,8 @@ func CreateTunnel(
 	}
 
 	if config.PrivateKey != tunnelPrivateKey ||
-		config.ListenPort != tunnelAddress.Port {
-		return errors.New("")
+		config.ListenPort != tunnel.ListenPort {
+		return errors.New("Could not create tunnel")
 	}
 
 	return nil
