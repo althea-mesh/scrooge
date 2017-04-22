@@ -1,8 +1,9 @@
 package network
 
 import (
-	"log"
 	"net"
+
+	"github.com/golang/glog"
 )
 
 type Network struct {
@@ -62,7 +63,7 @@ func (self *Network) SendUDP(
 		return err
 	}
 
-	log.Println("sent: " + s)
+	glog.Infoln("sent: " + s)
 	return nil
 }
 

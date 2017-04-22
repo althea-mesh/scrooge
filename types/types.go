@@ -10,8 +10,6 @@ type Account struct {
 	PrivateKey [ed25519.PrivateKeySize]byte
 	Seqnum     uint64
 	// TunnelAddresses  map[string]net.UDPAddr
-	TunnelPublicKey  string
-	TunnelPrivateKey string
 }
 
 type Neighbor struct {

@@ -1,14 +1,15 @@
 package main
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 
+	"io/ioutil"
+
 	"github.com/agl/ed25519"
+	"github.com/golang/glog"
 	"github.com/incentivized-mesh-infrastructure/scrooge/neighborAPI"
 	"github.com/incentivized-mesh-infrastructure/scrooge/network"
 	"github.com/incentivized-mesh-infrastructure/scrooge/types"
@@ -20,56 +21,41 @@ func main() {
 
 	ifi := flag.String("interface", "", "Physical network interface to operate on.")
 
-	publicKey := flag.String("publicKey", "", "PublicKey to sign messages to other nodes.")
-	privateKey := flag.String("privateKey", "", "PrivateKey to sign messages to other nodes.")
-
-	tunnelPublicKey := flag.String("tunnelPublicKey", "", "PublicKey of authenticated tunnel")
-	tunnelPrivateKey := flag.String("tunnelPrivateKey", "", "PrivateKey of authenticated tunnel")
+	publicKeyFile := flag.String("publicKey", "", "PublicKey to sign messages to other nodes.")
+	privateKeyFile := flag.String("privateKey", "", "PrivateKey to sign messages to other nodes.")
 
 	flag.Parse()
 
 	if *genkeys {
-		scroogePubkey, scroogePrivkey, err := ed25519.GenerateKey(rand.Reader)
+		publicKey, privateKey, err := wireguard.Genkeys()
 		if err != nil {
-			log.Fatalln(err)
-		}
-
-		// fmt.Printf("%#v %#v", scroogePubkey, scroogePrivkey)
-
-		wireguardPubkey, wireguardPrivkey, err := wireguard.Genkeys()
-		if err != nil {
-			log.Fatalln(err)
+			glog.Fatalln(err)
 		}
 
 		fmt.Printf(
-			`scrooge pubkey: %v
-
-scrooge privkey: %v
-
-wireguard pubkey: %v
-wireguard privkey: %v
+			`
+public key: %v
+private vkey: %v
 `,
-			base64.StdEncoding.EncodeToString(scroogePubkey[:]),
-			base64.StdEncoding.EncodeToString(scroogePrivkey[:]),
-			wireguardPubkey,
-			wireguardPrivkey,
+			publicKey,
+			privateKey,
 		)
 
 	} else {
 
 		iface, err := net.InterfaceByName(*ifi)
 		if err != nil {
-			log.Fatalln(err)
+			glog.Fatalln(err)
 		}
 
-		pubKey, err := base64.StdEncoding.DecodeString(*publicKey)
+		pubKey, err := readBase64File(*publicKeyFile)
 		if err != nil {
-			log.Fatalln(err)
+			glog.Fatalln(err)
 		}
 
-		privKey, err := base64.StdEncoding.DecodeString(*privateKey)
+		privKey, err := readBase64File(*privateKeyFile)
 		if err != nil {
-			log.Fatalln(err)
+			glog.Fatalln(err)
 		}
 
 		network := network.Network{
@@ -80,17 +66,15 @@ wireguard privkey: %v
 			Neighbors: map[[ed25519.PublicKeySize]byte]*types.Neighbor{},
 			Network:   &network,
 			Account: &types.Account{
-				PublicKey:        types.BytesToPublicKey(pubKey),
-				PrivateKey:       types.BytesToPrivateKey(privKey),
-				TunnelPublicKey:  *tunnelPublicKey,
-				TunnelPrivateKey: *tunnelPrivateKey,
-				Seqnum:           0,
+				PublicKey:  types.BytesToPublicKey(pubKey),
+				PrivateKey: types.BytesToPrivateKey(privKey),
+				Seqnum:     0,
 			},
 		}
 
 		callback := func(err error) {
 			if err != nil {
-				log.Fatalln(err)
+				glog.Fatalln(err)
 			}
 		}
 		go network.McastListen(
@@ -104,8 +88,17 @@ wireguard privkey: %v
 			false,
 		)
 		if err != nil {
-			log.Fatalln(err)
+			glog.Fatalln(err)
 		}
 		select {}
 	}
+}
+
+func readBase64File(filename string) ([]byte, error) {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return base64.StdEncoding.DecodeString(string(b))
 }

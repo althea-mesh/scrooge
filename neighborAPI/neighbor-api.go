@@ -3,11 +3,11 @@ package neighborAPI
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 
 	"github.com/agl/ed25519"
+	"github.com/golang/glog"
 	"github.com/incentivized-mesh-infrastructure/scrooge/serialization"
 	"github.com/incentivized-mesh-infrastructure/scrooge/types"
 )
@@ -27,7 +27,7 @@ func (self *NeighborAPI) Handlers(
 ) error {
 	msg := strings.Split(string(b), " ")
 
-	log.Println("received: " + string(b))
+	glog.Infoln("received: " + string(b))
 
 	switch msg[0] {
 	case "scrooge_hello":
@@ -147,7 +147,7 @@ func (self *NeighborAPI) SendHelloMsg(
 		return err
 	}
 
-	log.Println("sent: " + s)
+	glog.Infoln("sent: " + s)
 
 	return nil
 }
@@ -166,9 +166,8 @@ func (self *NeighborAPI) SendTunnelMsg(
 			DestinationPublicKey: neighborPublicKey,
 			Seqnum:               self.Account.Seqnum,
 		},
-		TunnelEndpoint:  neighbor.Tunnel.Endpoint,
-		TunnelPublicKey: neighbor.Tunnel.PublicKey,
-		Confirm:         confirm,
+		TunnelEndpoint: neighbor.Tunnel.Endpoint,
+		Confirm:        confirm,
 	}
 
 	s, err := serialization.FmtTunnelMsg(
@@ -184,7 +183,7 @@ func (self *NeighborAPI) SendTunnelMsg(
 		return err
 	}
 
-	log.Println("sent: " + s)
+	glog.Infoln("sent: " + s)
 
 	return nil
 }

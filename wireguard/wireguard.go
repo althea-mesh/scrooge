@@ -12,8 +12,6 @@ import (
 
 	"bytes"
 
-	"fmt"
-
 	"github.com/incentivized-mesh-infrastructure/scrooge/types"
 )
 
@@ -35,18 +33,21 @@ func Genkeys() (string, string, error) {
 
 func execCommand(command string, args ...string) ([]byte, error) {
 	stdout, stderr := bytes.Buffer{}, bytes.Buffer{}
+
 	cmd := exec.Command(command, args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+
 	if err != nil {
-		fmt.Println("REAL ERR", err)
 		var message string
+
 		if stderr.Len() == 0 {
 			message = stdout.String()
 		} else {
 			message = stderr.String()
 		}
+
 		return nil, errors.New(
 			"command `" + command + " " +
 				strings.Join(args, " ") + "` failed. " + message)
@@ -60,6 +61,7 @@ func CreateTunnel(
 	tunnelPrivateKey string,
 ) error {
 	_, err := execCommand("ip", "link", "add", "dev", tunnel.VirtualInterface.Name, "type", "wireguard")
+
 	if err != nil {
 		if regexp.MustCompile(`File exists`).MatchString(err.Error()) {
 			_, err := execCommand("ip", "link", "del", tunnel.VirtualInterface.Name)

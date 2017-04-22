@@ -4,12 +4,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"strconv"
 
 	"github.com/agl/ed25519"
+	"github.com/golang/glog"
 	"github.com/incentivized-mesh-infrastructure/scrooge/types"
 )
 
@@ -50,12 +50,12 @@ func ParseHelloMsg(msg []string, confirm bool) (*types.HelloMessage, error) {
 		Confirm:         confirm,
 	}
 
-	log.Printf("parsed HelloMessage: %+v\n", h)
+	glog.Infof("parsed HelloMessage: %+v\n", h)
 
 	return h, nil
 }
 
-// scrooge_tunnel[_confirm] <sourcePublicKey> <destinationPublicKey> <tunnel publicKey> <tunnel endpoint> <seq num> <signature>
+// scrooge_tunnel[_confirm] <sourcePublicKey> <destinationPublicKey> <tunnel endpoint> <seq num> <signature>
 func FmtTunnelMsg(
 	msg types.TunnelMessage,
 	privateKey [ed25519.PrivateKeySize]byte,
@@ -69,11 +69,10 @@ func FmtTunnelMsg(
 	}
 
 	s := fmt.Sprintf(
-		"%v %v %v %v %v %v",
+		"%v %v %v %v %v",
 		msgType,
 		base64.StdEncoding.EncodeToString(msg.SourcePublicKey[:]),
 		base64.StdEncoding.EncodeToString(msg.DestinationPublicKey[:]),
-		msg.TunnelPublicKey,
 		msg.TunnelEndpoint,
 		msg.Seqnum,
 	)
@@ -91,12 +90,11 @@ func ParseTunnelMsg(msg []string, confirm bool) (*types.TunnelMessage, error) {
 
 	m := &types.TunnelMessage{
 		MessageMetadata: *messageMetadata,
-		TunnelPublicKey: msg[3],
-		TunnelEndpoint:  msg[4],
+		TunnelEndpoint:  msg[3],
 		Confirm:         confirm,
 	}
 
-	log.Printf("parsed TunnelMessage: %+v\n", m)
+	glog.Infof("parsed TunnelMessage: %+v\n", m)
 
 	return m, nil
 }
